@@ -456,3 +456,4 @@ Sempre que um botão é clicado, o ESP envia `200 OK` e entrega o HTML atualizad
 | ESP32 GPIO (Arduino) | API Reference | [docs.espressif.com/projects/arduino-esp32/en/latest/api/gpio.html](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/gpio.html) [web:36] |
 | ESP32 GPIO Pins Guide | uPyEasy | [upesy.com/blogs/tutorials/micropython-gpio-pins-of-esp32-usage](https://www.upesy.com/blogs/tutorials/micropython-gio-pins-of-esp32-usage) [web:33] |
 
+
