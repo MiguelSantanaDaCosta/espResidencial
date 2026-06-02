@@ -64,18 +64,41 @@ Antes de soldar componentes, você pode simular todo o projeto no **Wokwi**, um 
 
 ### 🌐 Acessando o Wokwi
 
-- **Site Oficial:** [wokwi.com](https://wokwi.com) [web:22][web:24]
-- **Documentação (PT-BR):** [docs.wokwi.com/pt-BR/](https://docs.wokwi.com/pt-BR/) [web:21][web:22]
-- **Template ESP32 + MicroPython:** [wokwi.com/projects/new/esp32](https://wokwi.com/projects/new/esp32)
+## 📝 Como usar no Wokwi
 
-### 📦 Componentes Equivalentes no Wokwi
+### 1. Criar novo projeto
+Acesse: [https://wokwi.com/projects/new/esp32](https://wokwi.com/projects/new/esp32). [web:50]
 
-| Componente Real | Componente no Wokwi | Observação |
-| :--- | :--- | :--- |
-| ESP32 NodeMCU-32S | `esp32` | Placa padrão, já vem com USB virtual |
-| Módulo de Relé 4CH | `relay` ou `led` (substituto) | Wokwi não tem módulo de relé 4CH nativo; use 4 LEDs como feedback visual [web:31][web:32] |
-| Cabo Jumper | Conexões automáticas | Arraste e conecte nos terminais |
-| Fonte 5V | USB virtual do ESP32 | Alimentação embutida na simulação |
+### 2. Substituir arquivos
+- `diagram.json ou wokwi.json` → cole o JSON acima.
+- `main.py` → cole o código `esp.py` do **MESTRE**.
+- Adicione as bibliotecas como arquivos `.py` no projeto. [web:48][web:51]
+
+### 3. Adicionar bibliotecas
+No painel esquerdo, adicione os arquivos:
+
+- `bh1750.py`
+- `aht21.py`
+- `ens160.py`
+- `mfrc522.py`
+- `tracker.py`
+- `simple.py`
+- `urequests.py` [web:48][web:51]
+
+### 4. Simular
+Clique em **Start Simulation** para iniciar a execução. [web:50]
+
+---
+
+## 🎮 Controles interativos
+
+| Sensor | Como simular |
+|---|---|
+| HC-SR04 | Clique no sensor e arraste o slider de distância. [web:49] |
+| BH1750 | Clique e ajuste o valor de luminosidade. |
+| AHT21 | Clique e altere temperatura e umidade. |
+| IR Tracker | Clique para alternar entre HIGH e LOW. |
+| Relés | Clique nos botões do escravo para ligar e desligar. |
 
 ### 🔧 Configurando o diagram.json
 
