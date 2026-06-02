@@ -114,17 +114,28 @@ class AirClimateSensor:
 
 class RFIDScanner:
     def __init__(self, sck, mosi, miso, cs, rst):
-        self.spi = SPI(2, baudrate=2500000, polarity=0, phase=0,
-                       sck=Pin(sck), mosi=Pin(mosi), miso=Pin(miso))
-        self.rfid = MFRC522(sck=sck, mosi=mosi, miso=miso, rst=rst, cs=cs)
+        try:
+            self.spi = SPI(2, baudrate=2500000, polarity=0, phase=0,
+                           sck=Pin(sck), mosi=Pin(mosi), miso=Pin(miso))
+            self.rfid = MFRC522(sck=sck, mosi=mosi, miso=miso, rst=rst, cs=cs)
+            print("[RFID] Leitor RFID iniciado com sucesso.")
+        except Exception as e:
+            print("[RFID] Erro ao iniciar:", e)
+            self.rfid = None
 
     def read_card(self):
-        (status, uid) = self.rfid.SelectTagSN()
-        if status == self.rfid.OK:
-            uid_str = "0x" + "".join(["{:02x}".format(i) for i in uid])
-            agora = time.localtime()
-            horario = f"{agora[3]:02d}:{agora[4]:02d}:{agora[5]:02d}"
-            return f"{uid_str} ({horario})"
+        if not self.rfid:
+            return None
+        try:
+            (status, uid) = self.rfid.SelectTagSN()
+            if status == self.rfid.OK:
+                uid_str = "0x" + "".join(["{:02x}".format(i) for i in uid])
+                agora = time.localtime()
+                horario = f"{agora[3]:02d}:{agora[4]:02d}:{agora[5]:02d}"
+                print(f"[RFID] Tag detectada: {uid_str} ({horario})")
+                return f"{uid_str} ({horario})"
+        except Exception as e:
+            print("[RFID] Erro leitura:", e)
         return None
 
 # ==============================================================================
@@ -132,9 +143,10 @@ class RFIDScanner:
 # ==============================================================================
 class FungosMaster:
     def __init__(self):
-        self.limites = {"luz": 50.0, "distancia": 30.0}
+        self.limites = {"luz": 50.0, "distancia": 5.0}
         self.leituras = {
-            "luz": 0, "distancia": 0, "presenca": "LIVRE", "rfid": "Aguardando...",
+            "luz": 0, "distancia": 0, "presenca": "LIVRE", "presenca_ultra": "LIVRE",
+            "rfid": "Aguardando...",
             "temp": 0, "hum": 0, "co2": 0, "tvoc": 0, "aqi": 0
         }
 
@@ -142,7 +154,9 @@ class FungosMaster:
         self.estado_enviado = {"ar": "", "cozinha": "", "sala": "", "externa": ""}
         self.estado_ventilador = False
 
+        # Inicializa I2C e verifica dispositivos
         self.i2c_bus = I2C(0, scl=Pin(22), sda=Pin(21), freq=100000)
+        print("[I2C] Dispositivos detectados:", [hex(d) for d in self.i2c_bus.scan()])
 
         self.ultrassonico = UltrasonicSensor(27, 14)
         self.luz = LightSensor(self.i2c_bus)
@@ -225,6 +239,7 @@ class FungosMaster:
         .input-group {{ margin: 10px 0; }} input {{ width: 60px; padding: 5px; text-align: center; }}
         .sensor-data p {{ margin: 8px 0; font-size: 15px; border-bottom: 1px solid #333; padding-bottom: 5px; }}
         .sensor-data b {{ color: #4CAF50; }}
+        .alerta {{ color: #ff9800; font-weight: bold; }}
     </style>
 </head>
 <body>
@@ -243,6 +258,7 @@ class FungosMaster:
             <h3>🛡️ Segurança e Presença</h3>
             <p>Distância: <b>{dist} cm</b></p>
             <p>Movimento (IR): <b>{presenca}</b></p>
+            <p>Presença (Ultra): <b class="alerta">{presenca_ultra}</b></p>
             <p style="border:none;">Acesso RFID:<br> <b style="color:#2196F3; font-size:14px;">{rfid}</b></p>
         </div>
         <div class="card">
@@ -278,12 +294,12 @@ class FungosMaster:
 """
         return html.format(
             luz=self.leituras["luz"], dist=self.leituras["distancia"],
-            presenca=self.leituras["presenca"], rfid=self.leituras["rfid"],
+            presenca=self.leituras["presenca"], presenca_ultra=self.leituras["presenca_ultra"],
+            rfid=self.leituras["rfid"],
             temp=self.leituras["temp"], hum=self.leituras["hum"],
             co2=self.leituras["co2"], tvoc=self.leituras["tvoc"], aqi=self.leituras["aqi"],
             lim_luz=self.limites["luz"], lim_dist=self.limites["distancia"]
         )
-
 
     def processar_servidor_web(self):
         try:
@@ -348,7 +364,6 @@ class FungosMaster:
 
         self.run_loop()
 
-
     def run_loop(self):
         ultimo_envio = time.ticks_ms()
         contador = 0
@@ -363,7 +378,7 @@ class FungosMaster:
 
             contador += 1
 
-            # Sensores rapidos a cada iteracao
+            # Sensor IR (presenca)
             try:
                 if self.tracker.is_line_present():
                     self.leituras["presenca"] = "DETECTADO"
@@ -374,8 +389,8 @@ class FungosMaster:
             except:
                 pass
 
-            # RFID a cada 10 iteracoes
-            if contador % 10 == 0:
+            # RFID a cada 5 iteracoes
+            if contador % 5 == 0:
                 try:
                     uid = self.rfid.read_card()
                     if uid:
@@ -388,20 +403,35 @@ class FungosMaster:
 
             # Sensores lentos a cada 3 segundos
             if time.ticks_diff(time.ticks_ms(), ultimo_envio) > 3000:
+                # Ultrassonico - aciona quando MENOS de 5cm
                 try:
                     dist = self.ultrassonico.read_distance()
                     if dist != -1:
                         self.leituras["distancia"] = round(dist, 1)
-                except:
-                    pass
+                        # Se distancia menor que 5cm, alguem esta muito proximo
+                        if 0 < dist < 5:
+                            self.leituras["presenca_ultra"] = "DETECTADO"
+                            self.enviar_comando_http("sala", "ON")
+                            print(f"[ULTRA] Presenca detectada a {dist:.1f}cm - Acionando Sala")
+                        else:
+                            self.leituras["presenca_ultra"] = "LIVRE"
+                            self.enviar_comando_http("sala", "OFF")
+                except Exception as e:
+                    print("[ULTRA] Erro:", e)
 
+                # Luminosidade
                 try:
                     lux = self.luz.read_lux()
                     if lux != -1:
                         self.leituras["luz"] = lux
+                        if lux < (self.limites["luz"] - 5):
+                            self.enviar_comando_http("cozinha", "ON")
+                        elif lux > (self.limites["luz"] + 5):
+                            self.enviar_comando_http("cozinha", "OFF")
                 except:
                     pass
 
+                # Clima e Ar
                 try:
                     temp, hum, eco2, tvoc, aqi = self.clima_ar.read_all()
                     if temp is not None:
